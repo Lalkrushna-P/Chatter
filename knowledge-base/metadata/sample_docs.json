@@ -1,0 +1,90 @@
+[
+  {
+    "id": "doc-headache-overview",
+    "title": "Tension-type headache",
+    "source": "Sample Medical Reference (illustrative)",
+    "source_url": "https://example.org/headache",
+    "category": "neurology",
+    "version": "2026",
+    "review_status": "approved",
+    "reviewed_at": "2026-01-15",
+    "content": "Tension-type headache is one of the most common causes of head pain. It often feels like a dull, pressing, or tight band around the head, usually on both sides. It is frequently related to stress, poor posture, screen use, tiredness, or dehydration. Pain is usually mild to moderate and does not typically cause vomiting or visual changes.\nWarning signs that need urgent assessment include a sudden 'worst-ever' headache, headache with fever and a stiff neck, headache with new weakness, numbness, confusion, difficulty speaking, or vision loss, or a headache after a head injury. These features are not typical of tension-type headache and require prompt medical evaluation."
+  },
+  {
+    "id": "doc-migraine",
+    "title": "Migraine",
+    "source": "Sample Medical Reference (illustrative)",
+    "source_url": "https://example.org/migraine",
+    "category": "neurology",
+    "version": "2026",
+    "review_status": "approved",
+    "reviewed_at": "2026-01-15",
+    "content": "Migraine is a common cause of moderate to severe headache, often on one side of the head, and may be throbbing. It can be accompanied by nausea, vomiting, and sensitivity to light or sound. Some people experience an 'aura' such as visual disturbances before the headache begins.\nMigraine is usually not dangerous, but sudden severe headache, headache with one-sided weakness or difficulty speaking, or the worst headache of one's life should be treated as an emergency because they can indicate other serious conditions."
+  },
+  {
+    "id": "doc-dehydration-headache",
+    "title": "Dehydration",
+    "source": "Sample Medical Reference (illustrative)",
+    "source_url": "https://example.org/dehydration",
+    "category": "general",
+    "version": "2026",
+    "review_status": "approved",
+    "reviewed_at": "2026-01-15",
+    "content": "Dehydration occurs when the body loses more fluid than it takes in. It can cause headache, dizziness, tiredness, a dry mouth, and dark urine. Mild dehydration can often be managed by drinking fluids gradually.\nSigns of significant dehydration that need prompt medical care include not passing urine, sunken eyes, severe dizziness when standing, confusion, or being unable to keep fluids down."
+  },
+  {
+    "id": "doc-chest-pain",
+    "title": "Chest pain warning signs",
+    "source": "Sample Medical Reference (illustrative)",
+    "source_url": "https://example.org/chest-pain",
+    "category": "cardiology",
+    "version": "2026",
+    "review_status": "approved",
+    "reviewed_at": "2026-01-15",
+    "content": "Chest pain has many causes, some minor (such as muscle strain or acid reflux) and some life-threatening (such as a heart attack). Chest pain that is a pressure or squeezing sensation, spreads to the arm, jaw, neck, or back, or comes with shortness of breath, sweating, nausea, or feeling faint can be a sign of a heart emergency.\nAnyone with these features should seek emergency medical care immediately and should not wait to see if the pain passes."
+  },
+  {
+    "id": "doc-fever",
+    "title": "Fever in adults",
+    "source": "Sample Medical Reference (illustrative)",
+    "source_url": "https://example.org/fever",
+    "category": "general",
+    "version": "2026",
+    "review_status": "approved",
+    "reviewed_at": "2026-01-15",
+    "content": "Fever is a common response to infection and is often caused by viral illnesses that improve on their own. Rest and fluids are usually helpful. A fever with a cough, sore throat, or body aches is often due to a common viral infection.\nSeek prompt medical care for a very high or persistent fever, a fever with a stiff neck, a rash that does not fade when pressed, difficulty breathing, confusion, or a fever that lasts several days without improvement."
+  },
+  {
+    "id": "doc-sore-throat",
+    "title": "Sore throat",
+    "source": "Sample Medical Reference (illustrative)",
+    "source_url": "https://example.org/sore-throat",
+    "category": "ent",
+    "version": "2026",
+    "review_status": "approved",
+    "reviewed_at": "2026-01-15",
+    "content": "A sore throat is most often caused by a viral infection and usually improves within a week. Symptoms can include throat pain, mild fever, and difficulty swallowing. Warm fluids and rest can help.\nSeek urgent care if there is difficulty breathing, difficulty swallowing saliva, drooling, a muffled voice, or severe one-sided throat swelling, as these can indicate a more serious infection."
+  },
+  {
+    "id": "doc-cough",
+    "title": "Cough",
+    "source": "Sample Medical Reference (illustrative)",
+    "source_url": "https://example.org/cough",
+    "category": "respiratory",
+    "version": "2026",
+    "review_status": "approved",
+    "reviewed_at": "2026-01-15",
+    "content": "A cough is often caused by a viral respiratory infection and usually clears within a few weeks. A cough with a runny nose and mild fever commonly reflects a cold.\nSeek medical care for a cough with shortness of breath, chest pain, coughing up blood, a high or persistent fever, or a cough that lasts more than three weeks."
+  },
+  {
+    "id": "doc-abdominal-pain",
+    "title": "Abdominal pain",
+    "source": "Sample Medical Reference (illustrative)",
+    "source_url": "https://example.org/abdominal-pain",
+    "category": "gastroenterology",
+    "version": "2026",
+    "review_status": "approved",
+    "reviewed_at": "2026-01-15",
+    "content": "Abdominal pain has many causes, including indigestion, gas, constipation, and viral gastroenteritis, many of which are not serious. Mild, short-lived pain often settles on its own.\nSeek prompt medical care for severe or worsening abdominal pain, pain with a high fever, persistent vomiting, blood in the stool or vomit, a rigid or very tender abdomen, or pain in a person who is pregnant."
+  }
+]

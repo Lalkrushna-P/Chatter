@@ -91,6 +91,27 @@ create index if not exists idx_medical_chunks_embedding
     with (lists = 100);
 
 -- ----------------------------------------------------------------------------
+-- Medical report uploads (analysis pipeline mirrors symptom triage)
+-- Raw file bytes go to Supabase Storage bucket `medical-reports`; storage_path
+-- points there. NOTE: the Storage bucket itself must be created manually in the
+-- Supabase dashboard (Storage > New bucket) — SQL cannot create Storage buckets.
+-- ----------------------------------------------------------------------------
+create table if not exists public.report_documents (
+    id uuid primary key default uuid_generate_v4(),
+    conversation_id uuid references public.conversations (id) on delete cascade,
+    filename text not null,
+    content_type text,
+    storage_path text,
+    extracted_text text,
+    analysis jsonb default '{}'::jsonb,
+    risk_level text default 'unknown',
+    status text default 'completed',
+    created_at timestamptz default now()
+);
+create index if not exists idx_report_documents_conversation
+    on public.report_documents (conversation_id);
+
+-- ----------------------------------------------------------------------------
 -- Feedback
 -- ----------------------------------------------------------------------------
 create table if not exists public.feedback (
@@ -145,6 +166,7 @@ alter table public.assessments enable row level security;
 alter table public.feedback enable row level security;
 alter table public.medical_documents enable row level security;
 alter table public.medical_chunks enable row level security;
+alter table public.report_documents enable row level security;
 
 -- Users: self only
 create policy "users_select_self" on public.users
@@ -178,6 +200,15 @@ create policy "feedback_owner" on public.feedback
         exists (
             select 1 from public.conversations c
             where c.id = feedback.conversation_id and c.user_id = auth.uid()
+        )
+    );
+
+-- Report documents: via owning conversation
+create policy "report_documents_owner" on public.report_documents
+    for all using (
+        exists (
+            select 1 from public.conversations c
+            where c.id = report_documents.conversation_id and c.user_id = auth.uid()
         )
     );
 

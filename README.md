@@ -108,6 +108,18 @@ failure mode.
 
 ---
 
+## Report analysis setup (optional — for scanned PDF / image OCR)
+
+Uploading text-based PDFs and DOCX reports works out of the box. Reading
+**scanned PDFs or photographed reports** uses local OCR (`pytesseract`), which
+needs two system binaries on PATH — they are not pip-installable:
+
+- **Tesseract OCR** — https://github.com/UB-Mannheim/tesseract/wiki (Windows installer)
+- **Poppler** (for rendering scanned PDF pages to images) — https://github.com/oschwartz10612/poppler-windows/releases
+
+Without these, text-based PDF/DOCX/plain-image extraction still works; only the
+scanned-PDF OCR fallback needs them.
+
 ## Supabase setup (optional, for persistence + real vector search)
 
 1. Create a Supabase project and enable the `vector` extension.
@@ -115,6 +127,8 @@ failure mode.
    RPC, and Row Level Security).
 3. Put `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `backend/.env`
    (service-role key is **server-side only** — never expose to the frontend).
+   For report uploads, also create a Storage bucket named `medical-reports`
+   (Storage > New bucket in the dashboard — this can't be done via SQL).
 4. Load the knowledge base:
    ```bash
    python scripts/ingest_documents.py
@@ -136,6 +150,8 @@ Keep `EMBEDDING_DIMENSIONS` in sync with the `vector(N)` size in `schema.sql`.
 | POST | `/api/assessment/{conversation_id}/end` | End & finalize |
 | POST | `/api/feedback` | Store user feedback |
 | GET | `/api/health` | Health / observability |
+| POST | `/api/reports/upload` | Upload a medical report (PDF/DOCX/image) for analysis |
+| GET | `/api/reports/{report_id}` | Fetch a stored report analysis |
 
 ---
 

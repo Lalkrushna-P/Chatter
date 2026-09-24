@@ -16,13 +16,15 @@ class LLMService:
     def __init__(self, settings: Settings | None = None):
         self.settings = settings or get_settings()
 
-    async def generate(self, system_prompt: str, user_prompt: str) -> str:
+    async def generate(
+        self, system_prompt: str, user_prompt: str, fallback: str | None = None
+    ) -> str:
         provider = self.settings.llm_provider
         if provider == "anthropic" and self.settings.llm_api_key:
             return await self._generate_anthropic(system_prompt, user_prompt)
         if provider == "openai" and self.settings.llm_api_key:
             return await self._generate_openai(system_prompt, user_prompt)
-        return self._generate_fallback(user_prompt)
+        return fallback or self._generate_fallback(user_prompt)
 
     async def _generate_anthropic(self, system_prompt: str, user_prompt: str) -> str:
         url = (self.settings.llm_base_url or "https://api.anthropic.com") + "/v1/messages"

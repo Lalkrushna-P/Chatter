@@ -16,6 +16,8 @@ class ChatRequest(BaseModel):
     )
     age: Optional[int] = Field(default=None, ge=0, le=120)
     is_pregnant: Optional[bool] = None
+    # Previously uploaded reports (see /api/reports/upload) to ground this turn.
+    report_ids: list[str] = Field(default_factory=list)
 
 
 class ChatResponse(BaseModel):

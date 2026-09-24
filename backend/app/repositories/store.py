@@ -41,6 +41,7 @@ class InMemoryStore:
         self.feedback: list[dict] = []
         self.chunks: list[dict] = []  # {id, document_id, content, embedding, metadata}
         self.documents: dict[str, dict] = {}
+        self.reports: dict[str, dict] = {}
 
     # --- Conversations ---
     def create_conversation(self, user_id: Optional[str]) -> dict:
@@ -114,6 +115,41 @@ class InMemoryStore:
         }
         self.feedback.append(rec)
         return rec
+
+    # --- Medical reports ---
+    def create_report(
+        self,
+        *,
+        conversation_id: Optional[str],
+        filename: str,
+        content_type: Optional[str],
+        extracted_text: str,
+        analysis: dict,
+        risk_level: str,
+        raw_bytes: Optional[bytes] = None,
+    ) -> dict:
+        rid = _new_id()
+        rec = {
+            "id": rid,
+            "conversation_id": conversation_id,
+            "filename": filename,
+            "content_type": content_type,
+            "extracted_text": extracted_text,
+            "analysis": analysis,
+            "risk_level": risk_level,
+            "status": "completed",
+            "created_at": _now(),
+        }
+        self.reports[rid] = rec
+        return rec
+
+    def get_report(self, report_id: str) -> Optional[dict]:
+        return self.reports.get(report_id)
+
+    def update_report(self, report_id: str, **fields) -> None:
+        rec = self.reports.get(report_id)
+        if rec:
+            rec.update(fields)
 
     # --- Knowledge base / vector search ---
     def add_chunk(self, chunk: dict) -> None:
@@ -197,6 +233,56 @@ class SupabaseStore(InMemoryStore):
         row = {"conversation_id": conversation_id, "rating": rating, "feedback_text": text}
         res = self.client.table("feedback").insert(row).execute()
         return res.data[0]
+
+    def create_report(
+        self,
+        *,
+        conversation_id: Optional[str],
+        filename: str,
+        content_type: Optional[str],
+        extracted_text: str,
+        analysis: dict,
+        risk_level: str,
+        raw_bytes: Optional[bytes] = None,
+    ) -> dict:
+        row = {
+            "conversation_id": conversation_id,
+            "filename": filename,
+            "content_type": content_type,
+            "extracted_text": extracted_text,
+            "analysis": analysis,
+            "risk_level": risk_level,
+            "status": "completed",
+        }
+        res = self.client.table("report_documents").insert(row).execute()
+        record = res.data[0]
+
+        # Best-effort raw-file upload: a missing/misconfigured Storage bucket
+        # should never break the (already-persisted) analysis.
+        if raw_bytes is not None:
+            try:
+                path = f"{record['id']}/{filename}"
+                self.client.storage.from_(self.settings.report_storage_bucket).upload(
+                    path, raw_bytes
+                )
+                self.client.table("report_documents").update(
+                    {"storage_path": path}
+                ).eq("id", record["id"]).execute()
+                record["storage_path"] = path
+            except Exception as exc:  # pragma: no cover
+                print(f"[store] Report storage upload failed ({exc}); text/analysis still saved")
+
+        return record
+
+    def get_report(self, report_id: str) -> Optional[dict]:
+        res = (
+            self.client.table("report_documents")
+            .select("*").eq("id", report_id).limit(1).execute()
+        )
+        return res.data[0] if res.data else None
+
+    def update_report(self, report_id: str, **fields) -> None:
+        self.client.table("report_documents").update(fields).eq("id", report_id).execute()
 
     async def match_chunks(
         self,

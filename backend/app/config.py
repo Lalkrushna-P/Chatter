@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     # --- Emergency contact (PRD section 32; configurable per region) ---
     emergency_number: str = "your local emergency number"
 
+    # --- Medical report upload & analysis ---
+    report_max_file_size_mb: int = 10
+    report_storage_bucket: str = "medical-reports"
+    ocr_language: str = "eng"
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

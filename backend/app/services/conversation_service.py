@@ -16,6 +16,7 @@ from app.schemas.chat import AssessmentSummary, ChatRequest, ChatResponse
 from app.schemas.common import RiskLevel, Symptom
 from app.services.llm_service import LLMService
 from app.services.rag_service import RAGService
+from app.services.report_service import ReportService
 from app.services.response_builder import (
     DISCLAIMER,
     OutputSafetyValidator,
@@ -27,6 +28,7 @@ from app.services.symptom_service import (
     CONTEXT_QUESTIONS,
     QuestionEngine,
     SymptomService,
+    parse_context_answer,
 )
 
 
@@ -40,6 +42,7 @@ class ConversationManager:
         self.rag = RAGService(self.settings, self.store)
         self.llm = LLMService(self.settings)
         self.validator = OutputSafetyValidator(self.settings)
+        self.reports = ReportService(self.settings, self.store)
 
     async def handle_message(self, req: ChatRequest) -> ChatResponse:
         # 1. Conversation
@@ -57,13 +60,28 @@ class ConversationManager:
         # 2. Load running assessment state
         state = self._load_state(conversation_id)
 
-        # Record patient context if provided this turn
+        # If a context question (subject/age/pregnancy) was asked last turn,
+        # interpret this free-text reply as its answer so the conversation
+        # moves on instead of re-asking the same question indefinitely.
+        self._consume_context_answer(state, req.message)
+
+        # Record patient context if explicitly provided this turn (takes
+        # priority over the free-text inference above).
         if req.subject:
             state["subject"] = req.subject
         if req.age is not None:
             state["age"] = req.age
         if req.is_pregnant is not None:
             state["is_pregnant"] = req.is_pregnant
+
+        # Accumulate any reports referenced across turns of this conversation
+        report_ids = list(dict.fromkeys(state.get("report_ids", []) + req.report_ids))
+        state["report_ids"] = report_ids
+        report_context = [
+            text
+            for rid in report_ids
+            if (text := self.reports.report_context_text(rid)) is not None
+        ]
 
         # 3. Symptom extraction (merge into state)
         existing = [Symptom(**s) for s in state.get("symptoms", [])]
@@ -78,6 +96,14 @@ class ConversationManager:
             if m["role"] == "user"
         ]
         verdict = self.safety.evaluate_conversation(user_messages)
+
+        # If the child/infant special flag already fired from the wording used
+        # ("my son...", "my baby..."), the subject is already known — skip
+        # asking the "is this for you or someone else?" context question.
+        if "subject" not in state and (
+            "infant" in verdict.special_flags or "child" in verdict.special_flags
+        ):
+            state["subject"] = "someone_else"
 
         # Tighten thresholds for special populations (PRD sections 31, 33)
         verdict = self._apply_special_population_rules(verdict, state)
@@ -115,8 +141,10 @@ class ConversationManager:
         # 7. Ask baseline context questions early if missing
         context_q = self._pending_context_question(state, verdict)
 
-        # 8. RAG retrieval
+        # 8. RAG retrieval (fold in any uploaded-report context for grounding)
         query = self.rag.build_query(req.message, merged)
+        if report_context:
+            query = f"{query} {' '.join(report_context)}"
         evidence = await self.rag.retrieve(query)
         sources = self.rag.to_sources(evidence)
         possible = self._possible_explanations(evidence)
@@ -131,6 +159,7 @@ class ConversationManager:
             red_flags=verdict.red_flags,
             evidence=evidence,
             special_flags=verdict.special_flags,
+            report_context=report_context,
         )
         llm_text = await self.llm.generate(SYSTEM_PROMPT, user_prompt)
 
@@ -230,12 +259,33 @@ class ConversationManager:
         self, state: dict, verdict: SafetyVerdict
     ) -> Optional[str]:
         if "subject" not in state:
+            state["awaiting_context"] = "subject"
             return CONTEXT_QUESTIONS["subject"]
         if state.get("subject") == "someone_else" and "age" not in state:
+            state["awaiting_context"] = "age"
             return CONTEXT_QUESTIONS["age"]
         if "pregnancy" in verdict.special_flags and state.get("is_pregnant") is None:
+            state["awaiting_context"] = "pregnancy"
             return CONTEXT_QUESTIONS["pregnancy"]
         return None
+
+    def _consume_context_answer(self, state: dict, message: str) -> None:
+        """Interpret this message as the answer to last turn's pending context
+        question (if any), so the same question is never re-asked (PRD section 33).
+        """
+        awaiting = state.pop("awaiting_context", None)
+        if not awaiting:
+            return
+        value = parse_context_answer(awaiting, message)
+        if awaiting == "subject":
+            state["subject"] = value
+        elif awaiting == "age":
+            # Record the attempt even on a failed parse so the question isn't
+            # asked again indefinitely; the risk floor logic already treats a
+            # missing age as "unknown" safely.
+            state["age"] = value
+        elif awaiting == "pregnancy":
+            state["is_pregnant"] = value
 
     def _possible_explanations(self, evidence: list) -> list[str]:
         """Derive up to 5 possible categories from retrieved evidence titles.

@@ -15,6 +15,7 @@ export function useChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const convRef = useRef(null);
+  const reportIdsRef = useRef([]);
 
   const send = useCallback(async (text) => {
     const trimmed = text.trim();
@@ -31,6 +32,7 @@ export function useChat() {
       const data = await api.sendMessage({
         conversationId: convRef.current,
         message: trimmed,
+        reportIds: reportIdsRef.current,
       });
       convRef.current = data.conversation_id;
       setConversationId(data.conversation_id);
@@ -60,8 +62,26 @@ export function useChat() {
     }
   }, [isLoading]);
 
+  const attachReport = useCallback((analysis) => {
+    if (!convRef.current && analysis.conversation_id) {
+      convRef.current = analysis.conversation_id;
+      setConversationId(analysis.conversation_id);
+    }
+    reportIdsRef.current = [...reportIdsRef.current, analysis.report_id];
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: nextId(),
+        role: "assistant",
+        content: `Report analyzed: ${analysis.filename}\n\n${analysis.summary}`,
+        at: new Date(),
+      },
+    ]);
+  }, []);
+
   const reset = useCallback(() => {
     convRef.current = null;
+    reportIdsRef.current = [];
     setConversationId(null);
     setRiskLevel("unknown");
     setLastMeta(null);
@@ -80,5 +100,6 @@ export function useChat() {
     error,
     send,
     reset,
+    attachReport,
   };
 }

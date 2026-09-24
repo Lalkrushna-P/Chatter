@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import assessment, chat, feedback, health
+from app.api import assessment, chat, feedback, health, reports
 from app.config import get_settings
 from app.repositories.store import get_store, seed_knowledge_base
 
@@ -40,6 +40,7 @@ def create_app() -> FastAPI:
     app.include_router(chat.router)
     app.include_router(assessment.router)
     app.include_router(feedback.router)
+    app.include_router(reports.router)
 
     @app.get("/")
     async def root() -> dict:

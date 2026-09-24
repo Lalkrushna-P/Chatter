@@ -174,6 +174,41 @@ CONTEXT_QUESTIONS = {
     "pregnancy": "Are you currently pregnant or could you be pregnant?",
 }
 
+_SOMEONE_ELSE_PHRASES = [
+    "someone else", "another person", "my friend", "my wife", "my husband",
+    "my partner", "my mother", "my father", "my parent", "my sister",
+    "my brother", "my son", "my daughter", "my child", "my kid", "my baby",
+    "not for me", "not me",
+]
+_PREGNANT_YES_PHRASES = ["yes", "pregnant", "i am", "i'm", "could be"]
+_PREGNANT_NO_PHRASES = ["no", "not pregnant", "n/a", "na"]
+
+
+def parse_context_answer(awaiting: str, text: str):
+    """Deterministically interpret a free-text reply to a pending context
+    question (PRD section 33). Rule-based, like the rest of this module, so a
+    single-word or short reply is enough to move the conversation forward
+    instead of re-asking the same structured question indefinitely.
+    """
+    normalized = _normalize(text)
+    if awaiting == "subject":
+        if any(p in normalized for p in _SOMEONE_ELSE_PHRASES):
+            return "someone_else"
+        return "self"
+
+    if awaiting == "age":
+        m = re.search(r"\b(\d{1,3})\b", normalized)
+        return int(m.group(1)) if m else None
+
+    if awaiting == "pregnancy":
+        if any(p in normalized for p in _PREGNANT_NO_PHRASES):
+            return False
+        if any(p in normalized for p in _PREGNANT_YES_PHRASES):
+            return True
+        return False
+
+    return None
+
 
 class QuestionEngine:
     def next_question(

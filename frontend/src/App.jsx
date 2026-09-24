@@ -4,12 +4,22 @@ import RiskIndicator from "./components/Assessment/RiskIndicator.jsx";
 import Recommendation from "./components/Assessment/Recommendation.jsx";
 import SymptomSummary from "./components/Assessment/SymptomSummary.jsx";
 import Disclaimer from "./components/Common/Disclaimer.jsx";
+import ReportUpload from "./components/Reports/ReportUpload.jsx";
 import { useChat } from "./hooks/useChat.js";
 import { api } from "./services/api.js";
 
 export default function App() {
-  const { messages, conversationId, riskLevel, lastMeta, isLoading, error, send, reset } =
-    useChat();
+  const {
+    messages,
+    conversationId,
+    riskLevel,
+    lastMeta,
+    isLoading,
+    error,
+    send,
+    reset,
+    attachReport,
+  } = useChat();
   const [summary, setSummary] = useState(null);
   const [summaryError, setSummaryError] = useState(null);
 
@@ -79,6 +89,8 @@ export default function App() {
         {/* Assessment side panel */}
         <aside className="flex min-h-0 flex-[2] flex-col gap-4 overflow-y-auto">
           <RiskIndicator riskLevel={riskLevel} />
+
+          <ReportUpload conversationId={conversationId} onAnalyzed={attachReport} />
 
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <h2 className="mb-2 text-sm font-semibold text-slate-700">

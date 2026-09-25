@@ -12,6 +12,17 @@ import httpx
 from app.config import Settings, get_settings
 
 
+def _raise_with_body(resp: httpx.Response, provider: str) -> None:
+    """Like resp.raise_for_status(), but includes the response body — provider
+    error responses (e.g. OpenAI's 429 insufficient_quota vs rate_limit_exceeded)
+    carry the actually-useful detail there, not in the generic status line.
+    """
+    if resp.status_code >= 400:
+        raise RuntimeError(
+            f"{provider} API error {resp.status_code}: {resp.text[:500]}"
+        )
+
+
 class LLMService:
     def __init__(self, settings: Settings | None = None):
         self.settings = settings or get_settings()
@@ -48,7 +59,7 @@ class LLMService:
         }
         async with httpx.AsyncClient(timeout=45) as client:
             resp = await client.post(url, headers=headers, json=payload)
-            resp.raise_for_status()
+            _raise_with_body(resp, "anthropic")
             data = resp.json()
         return "".join(
             block.get("text", "") for block in data.get("content", [])
@@ -68,7 +79,7 @@ class LLMService:
         }
         async with httpx.AsyncClient(timeout=45) as client:
             resp = await client.post(url, headers=headers, json=payload)
-            resp.raise_for_status()
+            _raise_with_body(resp, "openai")
             data = resp.json()
         return data["choices"][0]["message"]["content"].strip()
 

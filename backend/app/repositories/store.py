@@ -158,6 +158,9 @@ class InMemoryStore:
     def seed_chunks(self, chunks: list[dict]) -> None:
         self.chunks.extend(chunks)
 
+    def count_chunks(self) -> int:
+        return len(self.chunks)
+
     async def match_chunks(
         self,
         query_embedding: list[float],
@@ -368,6 +371,13 @@ class SupabaseStore(InMemoryStore):
             return await super().match_chunks(
                 query_embedding, top_k, category, approved_only
             )
+
+    def count_chunks(self) -> int:
+        try:
+            res = self.client.table("medical_chunks").select("id", count="exact").limit(1).execute()
+            return res.count or 0
+        except Exception:
+            return super().count_chunks()
 
 
 # ---------------------------------------------------------------------------

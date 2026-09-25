@@ -17,5 +17,5 @@ async def health() -> dict:
         "llm_provider": settings.llm_provider,
         "embedding_provider": settings.embedding_provider,
         "supabase_enabled": settings.supabase_enabled,
-        "knowledge_chunks_loaded": len(store.chunks),
+        "knowledge_chunks_loaded": store.count_chunks(),
     }

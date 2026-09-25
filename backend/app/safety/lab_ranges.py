@@ -40,6 +40,12 @@ LAB_RANGES: list[LabRange] = [
     LabRange("alt", ["alt", "sgpt", "alanine aminotransferase"], "U/L", 7.0, 56.0),
     LabRange("ast", ["ast", "sgot", "aspartate aminotransferase"], "U/L", 8.0, 48.0),
     LabRange("tsh", ["tsh", "thyroid stimulating hormone"], "mIU/L", 0.4, 4.0),
+    LabRange("sodium", ["sodium", "serum sodium", "na+", "na"], "mEq/L", 135.0, 145.0),
+    LabRange("potassium", ["potassium", "serum potassium", "k+", "k"], "mEq/L", 3.5, 5.0),
+    LabRange("hba1c", ["hba1c", "hemoglobin a1c", "glycated hemoglobin", "a1c"], "%", 4.0, 5.6),
+    LabRange("vitamin d", ["vitamin d", "25-hydroxyvitamin d", "25-oh vitamin d", "vit d"],
+              "ng/mL", 30.0, 100.0),
+    LabRange("vitamin b12", ["vitamin b12", "cobalamin", "b12"], "pg/mL", 200.0, 900.0),
 ]
 
 _ALIAS_TO_RANGE: dict[str, LabRange] = {

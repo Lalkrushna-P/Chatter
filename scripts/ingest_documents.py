@@ -40,7 +40,18 @@ def main() -> None:
     from supabase import create_client
 
     client = create_client(url, key)
+
+    # Idempotent by title: re-running this script (e.g. after adding new docs
+    # to sample_docs.json) must not duplicate documents already ingested.
+    existing_titles = {
+        row["title"]
+        for row in (client.table("medical_documents").select("title").execute().data or [])
+    }
+
     for d in docs:
+        if d["title"] in existing_titles:
+            print(f"Skipping {d['title']} (already ingested)")
+            continue
         row = {
             "title": d["title"],
             "source": d.get("source"),

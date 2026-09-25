@@ -20,6 +20,7 @@ from app.services.report_service import ReportService
 from app.services.response_builder import (
     DISCLAIMER,
     OutputSafetyValidator,
+    build_grounded_fallback,
     recommended_action,
     warning_signs_for,
 )
@@ -161,7 +162,9 @@ class ConversationManager:
             special_flags=verdict.special_flags,
             report_context=report_context,
         )
-        llm_text = await self.llm.generate(SYSTEM_PROMPT, user_prompt)
+        llm_text = await self.llm.generate(
+            SYSTEM_PROMPT, user_prompt, fallback=build_grounded_fallback(evidence, merged)
+        )
 
         # 10. Output safety validation
         safe_text = self.validator.sanitize(llm_text)

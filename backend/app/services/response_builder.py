@@ -77,6 +77,51 @@ class OutputSafetyValidator:
         )
 
 
+def build_grounded_fallback(evidence: list, symptoms: list) -> str:
+    """Deterministic, evidence-grounded connective text for LLMService.generate's
+    `fallback` parameter — used whenever no LLM call succeeds (no provider
+    configured, or a provider failure like the offline/no-key path or a bad
+    key/quota error).
+
+    The generic canned text used previously said the same thing regardless of
+    what RAG actually retrieved, even though `possible_categories`/`sources` in
+    the API response were already grounded — this makes the message text match,
+    so the app is genuinely useful without any LLM at all (README "Runs with
+    zero API keys"), not just a safety-net placeholder.
+    """
+    symptom_names = ", ".join(s.name for s in symptoms) if symptoms else None
+    intro = (
+        f"Thanks for sharing that you've been experiencing {symptom_names}."
+        if symptom_names
+        else "Thanks for sharing that."
+    )
+
+    if not evidence:
+        return (
+            f"{intro} I don't have specific reference material for this yet, so I "
+            "can't offer detailed possibilities, but I'll keep asking a few "
+            "questions to help understand how urgent this may be."
+        )
+
+    titles: list[str] = []
+    for e in evidence[:3]:
+        title = (e.title or "").strip()
+        if title and title not in titles:
+            titles.append(title)
+    possibilities = ", ".join(titles)
+
+    blurb = (evidence[0].content or "").strip().split("\n")[0]
+    if len(blurb) > 220:
+        blurb = blurb[:220].rsplit(" ", 1)[0] + "…"
+
+    return (
+        f"{intro} What you're describing can sometimes be related to things like "
+        f"{possibilities}. {blurb} This is general information based on our "
+        "reference material, not a determination of what's causing your symptoms "
+        "— I'll ask a couple more questions to help narrow things down."
+    )
+
+
 def recommended_action(risk: RiskLevel) -> str:
     return RECOMMENDED_ACTION.get(risk, RECOMMENDED_ACTION[RiskLevel.UNKNOWN])
 

@@ -32,6 +32,17 @@ SYMPTOM_LEXICON = {
     "cold": ["cold", "runny nose", "stuffy nose", "congestion"],
     "numbness": ["numbness", "numb", "tingling"],
     "weakness": ["weakness", "weak"],
+    "joint pain": ["joint pain", "joint ache", "achy joints", "sore joints"],
+    "ear pain": ["ear pain", "earache", "ear ache", "ear hurts"],
+    "eye pain": ["eye pain", "eye redness", "red eye", "eyes are red", "itchy eyes"],
+    "insomnia": ["can't sleep", "cant sleep", "trouble sleeping", "insomnia",
+                 "not sleeping"],
+    "palpitations": ["palpitations", "heart racing", "heart is racing",
+                     "racing heart", "heart pounding", "irregular heartbeat"],
+    "swelling": ["swelling", "swollen legs", "swollen ankles", "leg swelling",
+                 "ankle swelling", "edema"],
+    "constipation": ["constipation", "constipated", "can't poop", "cant poop",
+                     "haven't pooped", "havent pooped"],
 }
 
 ONSET_PATTERNS = {
@@ -158,6 +169,28 @@ QUESTION_BANK: dict[str, list[str]] = {
     ],
     "rash": [
         "Is the rash spreading, and do you have a fever or any swelling of the lips, tongue, or face?",
+    ],
+    "joint pain": [
+        "Which joint(s) are affected, and is there any redness, warmth, or swelling?",
+        "Did this follow an injury, and does it affect your ability to move the joint?",
+    ],
+    "ear pain": [
+        "Is it in one ear or both, and do you have any fever, hearing loss, or discharge from the ear?",
+    ],
+    "eye pain": [
+        "Is there any vision change, light sensitivity, or discharge from the eye?",
+    ],
+    "insomnia": [
+        "How many nights has this been going on, and is anything specific keeping you awake (pain, stress, racing thoughts)?",
+    ],
+    "palpitations": [
+        "Does it happen at rest or with activity, and do you have any chest pain, shortness of breath, or dizziness with it?",
+    ],
+    "swelling": [
+        "Is the swelling in one leg or both, and do you have any shortness of breath, chest pain, or pain in the calf?",
+    ],
+    "constipation": [
+        "How many days has it been, and do you have any severe abdominal pain, vomiting, or blood in your stool?",
     ],
 }
 

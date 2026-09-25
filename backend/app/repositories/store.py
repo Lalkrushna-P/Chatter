@@ -366,8 +366,11 @@ class SupabaseStore(InMemoryStore):
                 },
             ).execute()
             return res.data or []
-        except Exception:
-            # Fall back to in-memory matching if RPC unavailable.
+        except Exception as exc:
+            # Fall back to in-memory matching if RPC unavailable. Logged (not
+            # silent) since an empty in-memory fallback for SupabaseStore means
+            # retrieval silently returns nothing — worth knowing why.
+            print(f"[store] match_medical_chunks RPC failed ({exc}); falling back to in-memory match")
             return await super().match_chunks(
                 query_embedding, top_k, category, approved_only
             )
@@ -376,7 +379,8 @@ class SupabaseStore(InMemoryStore):
         try:
             res = self.client.table("medical_chunks").select("id", count="exact").limit(1).execute()
             return res.count or 0
-        except Exception:
+        except Exception as exc:
+            print(f"[store] medical_chunks count query failed ({exc}); falling back to in-memory count")
             return super().count_chunks()
 
 

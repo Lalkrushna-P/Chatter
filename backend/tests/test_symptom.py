@@ -39,3 +39,23 @@ def test_question_engine_avoids_repeats():
     first = qe.next_question(symptoms, [])
     second = qe.next_question(symptoms, [first])
     assert first != second
+
+
+def test_question_engine_skips_already_known_attribute():
+    # Onset and severity already known -> the question fishing for both should
+    # be skipped entirely, not just avoided-if-already-asked.
+    symptoms = [Symptom(name="headache", onset="gradual", severity=2)]
+    q = qe.next_question(symptoms, [])
+    assert "suddenly or gradually" not in q
+    assert "how severe" not in q.lower()
+
+
+def test_question_engine_skips_already_mentioned_related_symptom():
+    # "vomiting" was already extracted as its own symptom, so the headache
+    # question asking "do you have ... vomiting ..." should be skipped.
+    symptoms = [
+        Symptom(name="headache", onset="gradual", severity=2),
+        Symptom(name="vomiting"),
+    ]
+    q = qe.next_question(symptoms, [])
+    assert "fever, vomiting" not in q

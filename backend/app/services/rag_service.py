@@ -35,7 +35,16 @@ class RAGService:
         self.embedder = embedder or EmbeddingService(self.settings)
 
     def build_query(self, message: str, symptoms: list[Symptom]) -> str:
-        """Combine the user's message with structured symptoms into a retrieval query."""
+        """Combine the user's message with structured symptoms into a retrieval query.
+
+        Folds in every attribute extracted so far (not just location/severity) —
+        duration, onset, frequency, and trigger/relieving/worsening factors are
+        exactly the clinically differentiating detail follow-up answers add
+        (e.g. "sudden" vs "gradual" onset separates thunderclap headache from
+        tension-type). Without them here, each answer only helped retrieval for
+        the one turn it was mentioned in, so the possible-explanations list
+        never actually narrowed as the conversation progressed.
+        """
         parts = [message]
         for s in symptoms:
             fragment = s.name
@@ -43,6 +52,18 @@ class RAGService:
                 fragment += f" {s.location}"
             if s.severity is not None:
                 fragment += f" severity {s.severity}"
+            if s.duration:
+                fragment += f" duration {s.duration}"
+            if s.onset:
+                fragment += f" onset {s.onset}"
+            if s.frequency:
+                fragment += f" frequency {s.frequency}"
+            if s.trigger:
+                fragment += f" trigger {s.trigger}"
+            if s.relieving_factors:
+                fragment += f" relieved by {s.relieving_factors}"
+            if s.worsening_factors:
+                fragment += f" worse with {s.worsening_factors}"
             parts.append(fragment)
             parts.extend(s.associated_symptoms)
         return " ".join(parts)

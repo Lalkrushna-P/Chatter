@@ -5,6 +5,7 @@ LLM is configured it could be swapped in, but a deterministic extractor is easie
 to audit for a health application (PRD section 45).
 """
 import re
+from dataclasses import dataclass
 from typing import Optional
 
 from app.schemas.common import Symptom
@@ -32,7 +33,8 @@ SYMPTOM_LEXICON = {
     "cold": ["cold", "runny nose", "stuffy nose", "congestion"],
     "numbness": ["numbness", "numb", "tingling"],
     "weakness": ["weakness", "weak"],
-    "joint pain": ["joint pain", "joint ache", "achy joints", "sore joints"],
+    "joint pain": ["joint pain", "joint ache", "achy joints", "sore joints",
+                   "joint hurts", "joints hurt"],
     "ear pain": ["ear pain", "earache", "ear ache", "ear hurts"],
     "eye pain": ["eye pain", "eye redness", "red eye", "eyes are red", "itchy eyes"],
     "insomnia": ["can't sleep", "cant sleep", "trouble sleeping", "insomnia",
@@ -131,73 +133,178 @@ class SymptomService:
 # Follow-up question engine (PRD section 9)
 # ---------------------------------------------------------------------------
 
+
+@dataclass(frozen=True)
+class FollowUpQuestion:
+    """A candidate follow-up question, tagged with what it's trying to learn.
+
+    `skip_if_attrs`: Symptom attributes (severity/duration/onset/...) this
+    question is fishing for — skipped once ALL of them are already known
+    (from the initial message or an earlier answer), so the same ground
+    isn't re-asked once it's been volunteered.
+    `skip_if_any_present`: canonical symptom names (e.g. "fever", "nausea")
+    this question is really asking "do you also have X" — skipped if the
+    user already separately mentioned any of them, since re-asking "do you
+    have fever?" after they already said they have a fever is redundant.
+    """
+
+    text: str
+    skip_if_attrs: tuple[str, ...] = ()
+    skip_if_any_present: tuple[str, ...] = ()
+
+
 # Symptom-specific question banks. Ordered by clinical usefulness.
-QUESTION_BANK: dict[str, list[str]] = {
+QUESTION_BANK: dict[str, list[FollowUpQuestion]] = {
     "headache": [
-        "Where exactly is the headache located, and did it start suddenly or gradually?",
-        "On a scale of 0-10, how severe is the pain?",
-        "Do you have any fever, vomiting, vision problems, or weakness/numbness?",
-        "Have you had any recent head injury?",
+        FollowUpQuestion(
+            "Where exactly is the headache located, and did it start suddenly or gradually?",
+            skip_if_attrs=("onset",),
+        ),
+        FollowUpQuestion(
+            "On a scale of 0-10, how severe is the pain?", skip_if_attrs=("severity",)
+        ),
+        FollowUpQuestion(
+            "Do you have any fever, vomiting, vision problems, or weakness/numbness?",
+            skip_if_any_present=("fever", "vomiting", "numbness", "weakness"),
+        ),
+        FollowUpQuestion("Have you had any recent head injury?"),
     ],
     "chest pain": [
-        "When did the chest pain start, and is it happening right now?",
-        "Is it a pressure, squeezing, burning, or stabbing sensation, and does it spread to your arm, jaw, or back?",
-        "Are you experiencing shortness of breath, sweating, or nausea?",
+        FollowUpQuestion(
+            "When did the chest pain start, and is it happening right now?",
+            skip_if_attrs=("onset",),
+        ),
+        FollowUpQuestion(
+            "Is it a pressure, squeezing, burning, or stabbing sensation, and does it "
+            "spread to your arm, jaw, or back?"
+        ),
+        FollowUpQuestion(
+            "Are you experiencing shortness of breath, sweating, or nausea?",
+            skip_if_any_present=("shortness of breath", "nausea"),
+        ),
     ],
     "sore throat": [
-        "Do you also have a fever, cough, difficulty swallowing, or difficulty breathing?",
-        "How many days have you had the sore throat?",
+        FollowUpQuestion(
+            "Do you also have a fever, cough, difficulty swallowing, or difficulty breathing?",
+            skip_if_any_present=("fever", "cough", "shortness of breath"),
+        ),
+        FollowUpQuestion(
+            "How many days have you had the sore throat?", skip_if_attrs=("duration",)
+        ),
     ],
     "fever": [
-        "How high is your temperature, and how many days have you had it?",
-        "Do you have any other symptoms such as a rash, stiff neck, difficulty breathing, or confusion?",
+        FollowUpQuestion(
+            "How high is your temperature, and how many days have you had it?",
+            skip_if_attrs=("duration",),
+        ),
+        FollowUpQuestion(
+            "Do you have any other symptoms such as a rash, stiff neck, difficulty "
+            "breathing, or confusion?",
+            skip_if_any_present=("rash", "shortness of breath"),
+        ),
     ],
     "cough": [
-        "How long have you had the cough, and are you bringing up any phlegm or blood?",
-        "Do you have a fever, shortness of breath, or chest pain?",
+        FollowUpQuestion(
+            "How long have you had the cough, and are you bringing up any phlegm or blood?",
+            skip_if_attrs=("duration",),
+        ),
+        FollowUpQuestion(
+            "Do you have a fever, shortness of breath, or chest pain?",
+            skip_if_any_present=("fever", "shortness of breath", "chest pain"),
+        ),
     ],
     "abdominal pain": [
-        "Where in your abdomen is the pain, and how severe is it from 0-10?",
-        "Do you have vomiting, fever, or blood in your stool?",
+        FollowUpQuestion(
+            "Where in your abdomen is the pain, and how severe is it from 0-10?",
+            skip_if_attrs=("severity",),
+        ),
+        FollowUpQuestion(
+            "Do you have vomiting, fever, or blood in your stool?",
+            skip_if_any_present=("vomiting", "fever"),
+        ),
     ],
     "dizziness": [
-        "Did the dizziness start suddenly, and do you have any weakness, numbness, or trouble speaking?",
-        "Do you feel faint, or is the room spinning?",
+        FollowUpQuestion(
+            "Did the dizziness start suddenly, and do you have any weakness, numbness, "
+            "or trouble speaking?",
+            skip_if_attrs=("onset",),
+        ),
+        FollowUpQuestion("Do you feel faint, or is the room spinning?"),
     ],
     "back pain": [
-        "Did the back pain follow an injury, and do you have any numbness, tingling, or trouble controlling your bladder or bowels?",
+        FollowUpQuestion(
+            "Did the back pain follow an injury, and do you have any numbness, "
+            "tingling, or trouble controlling your bladder or bowels?",
+            skip_if_any_present=("numbness",),
+        ),
     ],
     "rash": [
-        "Is the rash spreading, and do you have a fever or any swelling of the lips, tongue, or face?",
+        FollowUpQuestion(
+            "Is the rash spreading, and do you have a fever or any swelling of the "
+            "lips, tongue, or face?",
+            skip_if_any_present=("fever", "swelling"),
+        ),
     ],
     "joint pain": [
-        "Which joint(s) are affected, and is there any redness, warmth, or swelling?",
-        "Did this follow an injury, and does it affect your ability to move the joint?",
+        FollowUpQuestion(
+            "Which joint(s) are affected, and is there any redness, warmth, or swelling?",
+            skip_if_any_present=("swelling",),
+        ),
+        FollowUpQuestion(
+            "Did this follow an injury, and does it affect your ability to move the joint?"
+        ),
     ],
     "ear pain": [
-        "Is it in one ear or both, and do you have any fever, hearing loss, or discharge from the ear?",
+        FollowUpQuestion(
+            "Is it in one ear or both, and do you have any fever, hearing loss, or "
+            "discharge from the ear?",
+            skip_if_any_present=("fever",),
+        ),
     ],
     "eye pain": [
-        "Is there any vision change, light sensitivity, or discharge from the eye?",
+        FollowUpQuestion(
+            "Is there any vision change, light sensitivity, or discharge from the eye?"
+        ),
     ],
     "insomnia": [
-        "How many nights has this been going on, and is anything specific keeping you awake (pain, stress, racing thoughts)?",
+        FollowUpQuestion(
+            "How many nights has this been going on, and is anything specific keeping "
+            "you awake (pain, stress, racing thoughts)?",
+            skip_if_attrs=("duration",),
+        ),
     ],
     "palpitations": [
-        "Does it happen at rest or with activity, and do you have any chest pain, shortness of breath, or dizziness with it?",
+        FollowUpQuestion(
+            "Does it happen at rest or with activity, and do you have any chest pain, "
+            "shortness of breath, or dizziness with it?",
+            skip_if_any_present=("chest pain", "shortness of breath", "dizziness"),
+        ),
     ],
     "swelling": [
-        "Is the swelling in one leg or both, and do you have any shortness of breath, chest pain, or pain in the calf?",
+        FollowUpQuestion(
+            "Is the swelling in one leg or both, and do you have any shortness of "
+            "breath, chest pain, or pain in the calf?",
+            skip_if_any_present=("shortness of breath", "chest pain"),
+        ),
     ],
     "constipation": [
-        "How many days has it been, and do you have any severe abdominal pain, vomiting, or blood in your stool?",
+        FollowUpQuestion(
+            "How many days has it been, and do you have any severe abdominal pain, "
+            "vomiting, or blood in your stool?",
+            skip_if_attrs=("duration",),
+            skip_if_any_present=("vomiting", "abdominal pain"),
+        ),
     ],
 }
 
 GENERIC_QUESTIONS = [
-    "How long have you been experiencing this, and how severe would you say it is from 0-10?",
-    "Have you noticed any other symptoms alongside this?",
-    "Have your symptoms been getting better, worse, or staying the same?",
+    FollowUpQuestion(
+        "How long have you been experiencing this, and how severe would you say it "
+        "is from 0-10?",
+        skip_if_attrs=("duration", "severity"),
+    ),
+    FollowUpQuestion("Have you noticed any other symptoms alongside this?"),
+    FollowUpQuestion("Have your symptoms been getting better, worse, or staying the same?"),
 ]
 
 # Baseline context questions (PRD section 33)
@@ -249,21 +356,36 @@ class QuestionEngine:
         symptoms: list[Symptom],
         questions_asked: list[str],
     ) -> Optional[str]:
-        """Pick the next best unanswered question, avoiding repeats (PRD section 19)."""
+        """Pick the next best unanswered question, avoiding repeats (PRD section 19)
+        and skipping anything the user has already told us — whether asked
+        directly (an attribute like severity/onset already extracted) or
+        volunteered unprompted (a related symptom already mentioned).
+        """
         asked = set(questions_asked)
+        known_names = {s.name for s in symptoms}
 
         # Prefer questions tied to the most severe / first symptom.
-        ordered = sorted(
-            symptoms,
-            key=lambda s: (s.severity or 0),
-            reverse=True,
-        )
+        ordered = sorted(symptoms, key=lambda s: (s.severity or 0), reverse=True)
         for symptom in ordered:
             for q in QUESTION_BANK.get(symptom.name, []):
-                if q not in asked:
-                    return q
+                if q.text in asked or self._is_redundant(q, symptom, known_names):
+                    continue
+                return q.text
 
+        fallback_symptom = ordered[0] if ordered else None
         for q in GENERIC_QUESTIONS:
-            if q not in asked:
-                return q
+            if q.text in asked or self._is_redundant(q, fallback_symptom, known_names):
+                continue
+            return q.text
         return None
+
+    @staticmethod
+    def _is_redundant(
+        q: FollowUpQuestion, symptom: Optional[Symptom], known_names: set[str]
+    ) -> bool:
+        if q.skip_if_attrs and symptom is not None:
+            if all(getattr(symptom, attr, None) for attr in q.skip_if_attrs):
+                return True
+        if q.skip_if_any_present and known_names & set(q.skip_if_any_present):
+            return True
+        return False

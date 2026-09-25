@@ -581,5 +581,115 @@
     "review_status": "approved",
     "reviewed_at": "2026-01-15",
     "content": "Low vitamin B12 can cause fatigue, weakness, numbness or tingling in the hands/feet, and difficulty concentrating. Causes include diet (especially plant-based diets without supplementation), certain medications, and reduced absorption in the gut.\nSeek prompt medical follow-up for a low B12 result, especially with numbness/tingling, balance problems, or memory changes, as B12 deficiency affecting the nerves is treatable but can become harder to reverse the longer it continues untreated."
+  },
+  {
+    "id": "doc-sciatica",
+    "title": "Sciatica (nerve pain radiating to the leg)",
+    "source": "Sample Medical Reference (illustrative)",
+    "source_url": null,
+    "category": "musculoskeletal",
+    "version": "2026",
+    "review_status": "approved",
+    "reviewed_at": "2026-01-15",
+    "content": "Sciatica causes pain that radiates from the lower back or buttock down one leg, sometimes with tingling or numbness, usually from a compressed nerve in the lower spine. It often improves over weeks with gentle activity, stretching, and pain relief.\nSeek prompt medical care for sciatica with numbness in the groin/inner thighs, new bladder or bowel control problems, or progressive leg weakness, as these can indicate significant nerve compression needing urgent evaluation."
+  },
+  {
+    "id": "doc-night-sweats",
+    "title": "Night sweats",
+    "source": "Sample Medical Reference (illustrative)",
+    "source_url": null,
+    "category": "general",
+    "version": "2026",
+    "review_status": "approved",
+    "reviewed_at": "2026-01-15",
+    "content": "Night sweats can be caused by a warm sleeping environment, a recent viral infection, certain medications, or hormonal changes (such as menopause), and are often not a sign of anything serious.\nSeek medical evaluation for night sweats that are drenching and recurrent, especially with unintentional weight loss, fever, or swollen lymph nodes, as these combined features need investigation for an underlying cause."
+  },
+  {
+    "id": "doc-unintentional-weight-loss",
+    "title": "Unintentional weight loss",
+    "source": "Sample Medical Reference (illustrative)",
+    "source_url": null,
+    "category": "general",
+    "version": "2026",
+    "review_status": "approved",
+    "reviewed_at": "2026-01-15",
+    "content": "Losing weight without trying can happen with stress, a change in appetite, or a recent illness, and modest changes are often not concerning.\nSeek medical evaluation for losing more than about 5% of body weight over six to twelve months without trying, especially with fatigue, night sweats, changes in bowel habits, or loss of appetite, as this combination should be assessed to look for an underlying cause."
+  },
+  {
+    "id": "doc-swollen-lymph-nodes",
+    "title": "Swollen lymph nodes",
+    "source": "Sample Medical Reference (illustrative)",
+    "source_url": null,
+    "category": "general",
+    "version": "2026",
+    "review_status": "approved",
+    "reviewed_at": "2026-01-15",
+    "content": "Swollen lymph nodes (small lumps in the neck, armpit, or groin) are most often caused by a nearby infection, such as a cold or throat infection, and typically shrink back down within a few weeks as the infection resolves.\nSeek medical evaluation for lymph nodes that are hard, fixed in place, rapidly growing, larger than about an inch, or that persist beyond a few weeks, especially with fever, night sweats, or unintentional weight loss, as these need closer assessment."
+  },
+  {
+    "id": "doc-food-poisoning",
+    "title": "Food poisoning",
+    "source": "Sample Medical Reference (illustrative)",
+    "source_url": null,
+    "category": "gastroenterology",
+    "version": "2026",
+    "review_status": "approved",
+    "reviewed_at": "2026-01-15",
+    "content": "Food poisoning typically causes nausea, vomiting, diarrhea, and abdominal cramps starting within hours to a couple of days after eating contaminated food, and usually resolves within a day or two with rest and fluids.\nSeek prompt medical care for signs of dehydration, blood in vomit or stool, a high fever, symptoms lasting more than a few days, or severe abdominal pain, as these need closer evaluation and sometimes treatment."
+  },
+  {
+    "id": "doc-nosebleed",
+    "title": "Nosebleed",
+    "source": "Sample Medical Reference (illustrative)",
+    "source_url": null,
+    "category": "ent",
+    "version": "2026",
+    "review_status": "approved",
+    "reviewed_at": "2026-01-15",
+    "content": "Nosebleeds are commonly caused by dry air, nose picking, minor injury, or forceful nose blowing, and usually stop within about 10-15 minutes of firm pressure and leaning forward.\nSeek emergency care for a nosebleed that won't stop after 20-30 minutes of steady pressure, heavy bleeding, bleeding after a significant head injury, or a nosebleed alongside easy bruising elsewhere, as these need urgent evaluation."
+  },
+  {
+    "id": "doc-excessive-thirst",
+    "title": "Excessive thirst and urination",
+    "source": "Sample Medical Reference (illustrative)",
+    "source_url": null,
+    "category": "endocrinology",
+    "version": "2026",
+    "review_status": "approved",
+    "reviewed_at": "2026-01-15",
+    "content": "Feeling unusually thirsty along with urinating more often than normal, especially together with fatigue or unexplained weight loss, can be an early sign of high blood sugar/diabetes, though dehydration or heat can cause thirst on its own.\nSeek prompt medical evaluation for persistent excessive thirst and urination, especially with fatigue or weight loss. Seek emergency care for these symptoms with confusion, rapid breathing, or vomiting, as this can indicate a serious blood sugar complication."
+  },
+  {
+    "id": "doc-bruising-easily",
+    "title": "Bruising easily",
+    "source": "Sample Medical Reference (illustrative)",
+    "source_url": null,
+    "category": "hematology",
+    "version": "2026",
+    "review_status": "approved",
+    "reviewed_at": "2026-01-15",
+    "content": "Bruising more easily than usual can happen with minor bumps you don't remember, certain medications (like blood thinners), or simply thinner skin with age, and is often not serious on its own.\nSeek medical evaluation for new, frequent, or unexplained bruising, especially with unusual bleeding (gums, nosebleeds, blood in urine or stool), a rash of small red-purple spots, or bruising alongside fatigue, as these combined features need a blood check to look for an underlying cause."
+  },
+  {
+    "id": "doc-hair-loss",
+    "title": "Hair loss",
+    "source": "Sample Medical Reference (illustrative)",
+    "source_url": null,
+    "category": "dermatology",
+    "version": "2026",
+    "review_status": "approved",
+    "reviewed_at": "2026-01-15",
+    "content": "Hair loss is often related to stress, a recent illness or major life event, hormonal changes, certain medications, or nutritional deficiencies, and many cases improve on their own within months.\nSeek medical evaluation for sudden or patchy hair loss, hair loss with scalp redness/scaling/pain, or hair loss alongside other symptoms like fatigue or weight changes, as an underlying thyroid, nutritional, or skin condition may need addressing."
+  },
+  {
+    "id": "doc-urinary-incontinence",
+    "title": "Urinary incontinence",
+    "source": "Sample Medical Reference (illustrative)",
+    "source_url": null,
+    "category": "urology",
+    "version": "2026",
+    "review_status": "approved",
+    "reviewed_at": "2026-01-15",
+    "content": "Leaking urine, especially with coughing/sneezing/exercise (stress incontinence) or a sudden strong urge to urinate (urge incontinence), is common and often improves with pelvic floor exercises and lifestyle changes.\nSeek prompt medical care for new incontinence with back pain, numbness in the groin/inner thighs, leg weakness, or difficulty starting urination, as these can indicate a nerve or spinal problem needing urgent evaluation."
   }
 ]

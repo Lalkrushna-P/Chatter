@@ -51,9 +51,15 @@ create table if not exists public.assessments (
     possible_explanations jsonb default '[]'::jsonb,
     red_flags jsonb default '[]'::jsonb,
     status text default 'active',
+    -- Full running conversation state (questions_asked, subject/age/pregnancy,
+    -- report_ids, awaiting_context, ...) — fields above are denormalized copies
+    -- of the parts worth querying directly in SQL.
+    state jsonb default '{}'::jsonb,
     created_at timestamptz default now()
 );
 create index if not exists idx_assessments_conversation on public.assessments (conversation_id);
+-- Safe to re-run on an already-created table (adds the column if it predates this line).
+alter table public.assessments add column if not exists state jsonb default '{}'::jsonb;
 
 -- ----------------------------------------------------------------------------
 -- Medical knowledge base (PRD sections 13, 30)
@@ -169,14 +175,19 @@ alter table public.medical_chunks enable row level security;
 alter table public.report_documents enable row level security;
 
 -- Users: self only
+-- (Postgres has no `CREATE POLICY IF NOT EXISTS`, so drop-then-create makes
+-- this file safe to re-run against an already-provisioned database.)
+drop policy if exists "users_select_self" on public.users;
 create policy "users_select_self" on public.users
     for select using (auth.uid() = id);
 
 -- Conversations: owner only
+drop policy if exists "conversations_owner" on public.conversations;
 create policy "conversations_owner" on public.conversations
     for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- Messages: via owning conversation
+drop policy if exists "messages_owner" on public.messages;
 create policy "messages_owner" on public.messages
     for all using (
         exists (
@@ -186,6 +197,7 @@ create policy "messages_owner" on public.messages
     );
 
 -- Assessments: via owning conversation
+drop policy if exists "assessments_owner" on public.assessments;
 create policy "assessments_owner" on public.assessments
     for all using (
         exists (
@@ -195,6 +207,7 @@ create policy "assessments_owner" on public.assessments
     );
 
 -- Feedback: via owning conversation
+drop policy if exists "feedback_owner" on public.feedback;
 create policy "feedback_owner" on public.feedback
     for all using (
         exists (
@@ -204,6 +217,7 @@ create policy "feedback_owner" on public.feedback
     );
 
 -- Report documents: via owning conversation
+drop policy if exists "report_documents_owner" on public.report_documents;
 create policy "report_documents_owner" on public.report_documents
     for all using (
         exists (
@@ -213,8 +227,10 @@ create policy "report_documents_owner" on public.report_documents
     );
 
 -- Knowledge base: readable by any authenticated user; only PUBLISHED/APPROVED.
+drop policy if exists "medical_documents_read" on public.medical_documents;
 create policy "medical_documents_read" on public.medical_documents
     for select using (status in ('APPROVED', 'PUBLISHED'));
+drop policy if exists "medical_chunks_read" on public.medical_chunks;
 create policy "medical_chunks_read" on public.medical_chunks
     for select using (true);
 

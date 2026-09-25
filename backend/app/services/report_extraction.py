@@ -18,6 +18,14 @@ _MIN_CHARS_PER_PAGE = 20
 SUPPORTED_EXTENSIONS = {"pdf", "docx", "jpg", "jpeg", "png"}
 
 
+class OCRUnavailableError(RuntimeError):
+    """Raised when OCR is needed but the Tesseract/Poppler binaries aren't
+    present (e.g. a standard Vercel Python Function, which has no OS package
+    manager — see README "Report analysis setup"). Text-based PDF/DOCX
+    extraction doesn't need these and is unaffected.
+    """
+
+
 def _extension(filename: str) -> str:
     return filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
 
@@ -55,13 +63,23 @@ def _extract_pdf(data: bytes) -> str:
 
 def _ocr_pdf(data: bytes) -> str:
     from pdf2image import convert_from_bytes
+    from pdf2image.exceptions import PDFInfoNotInstalledError
     import pytesseract
 
     from app.config import get_settings
 
     settings = get_settings()
-    images = convert_from_bytes(data)
-    texts = [pytesseract.image_to_string(img, lang=settings.ocr_language) for img in images]
+    try:
+        images = convert_from_bytes(data)
+        texts = [
+            pytesseract.image_to_string(img, lang=settings.ocr_language) for img in images
+        ]
+    except (PDFInfoNotInstalledError, pytesseract.TesseractNotFoundError) as exc:
+        raise OCRUnavailableError(
+            "This looks like a scanned PDF, which needs OCR to read — OCR isn't "
+            "available in this deployment. Please upload a text-based PDF or DOCX "
+            "instead, or ask the site operator to enable OCR support."
+        ) from exc
     return "\n".join(texts).strip()
 
 
@@ -86,4 +104,11 @@ def _extract_image(data: bytes) -> str:
 
     settings = get_settings()
     image = Image.open(io.BytesIO(data))
-    return pytesseract.image_to_string(image, lang=settings.ocr_language).strip()
+    try:
+        return pytesseract.image_to_string(image, lang=settings.ocr_language).strip()
+    except pytesseract.TesseractNotFoundError as exc:
+        raise OCRUnavailableError(
+            "Reading image reports needs OCR, which isn't available in this "
+            "deployment. Please upload a text-based PDF or DOCX instead, or ask "
+            "the site operator to enable OCR support."
+        ) from exc

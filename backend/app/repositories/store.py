@@ -234,6 +234,68 @@ class SupabaseStore(InMemoryStore):
         res = self.client.table("feedback").insert(row).execute()
         return res.data[0]
 
+    def upsert_assessment(self, conversation_id: str, data: dict) -> dict:
+        """Persist the running conversation state to the `assessments` table.
+
+        `data` is often a partial update (e.g. `{"status": "completed"}`), so it
+        must be merged onto the existing record rather than replacing it — the
+        in-memory version does this via dict.update(); this mirrors that. The
+        full state dict (including fields with no dedicated column, like
+        questions_asked/subject/age/report_ids) is stored verbatim in the
+        `state` jsonb column; a few fields are also mirrored into their own
+        columns for direct SQL querying.
+        """
+        existing = self.get_assessment_by_conversation(conversation_id)
+        merged = {**(existing or {}), **data}
+        row = {
+            "conversation_id": conversation_id,
+            "symptoms": merged.get("symptoms", []),
+            "risk_level": merged.get("risk_level", "unknown"),
+            "possible_explanations": merged.get("possible_explanations", []),
+            "red_flags": merged.get("red_flags", []),
+            "status": merged.get("status", "active"),
+            "state": merged,
+        }
+        if existing:
+            res = (
+                self.client.table("assessments")
+                .update(row).eq("id", existing["id"]).execute()
+            )
+        else:
+            res = self.client.table("assessments").insert(row).execute()
+        return self._assessment_row_to_state(res.data[0])
+
+    def get_assessment(self, assessment_id: str) -> Optional[dict]:
+        res = (
+            self.client.table("assessments")
+            .select("*").eq("id", assessment_id).limit(1).execute()
+        )
+        return self._assessment_row_to_state(res.data[0]) if res.data else None
+
+    def get_assessment_by_conversation(self, conversation_id: str) -> Optional[dict]:
+        res = (
+            self.client.table("assessments")
+            .select("*").eq("conversation_id", conversation_id)
+            .limit(1).execute()
+        )
+        return self._assessment_row_to_state(res.data[0]) if res.data else None
+
+    @staticmethod
+    def _assessment_row_to_state(row: dict) -> dict:
+        state = dict(row.get("state") or {})
+        state["id"] = row["id"]
+        state["conversation_id"] = row["conversation_id"]
+        # Structured columns are the source of truth if the state blob and the
+        # columns ever disagree (e.g. a row edited directly in the dashboard).
+        state["symptoms"] = row.get("symptoms") or state.get("symptoms", [])
+        state["risk_level"] = row.get("risk_level") or state.get("risk_level", "unknown")
+        state["possible_explanations"] = (
+            row.get("possible_explanations") or state.get("possible_explanations", [])
+        )
+        state["red_flags"] = row.get("red_flags") or state.get("red_flags", [])
+        state["status"] = row.get("status") or state.get("status", "active")
+        return state
+
     def create_report(
         self,
         *,

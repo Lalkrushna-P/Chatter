@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     # provider: "anthropic" | "openai" | "none" (deterministic fallback)
     llm_provider: str = "none"
     llm_api_key: Optional[str] = None
-    llm_model: str = "claude-opus-4-8"
+    llm_model: str = "claude-sonnet-5"
     llm_base_url: Optional[str] = None  # for openai-compatible gateways
 
     # --- Embeddings ---

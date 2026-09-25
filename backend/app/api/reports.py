@@ -3,7 +3,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
 from app.config import get_settings
 from app.schemas.report import ReportAnalysis, ReportUploadResponse
-from app.services.report_extraction import SUPPORTED_EXTENSIONS
+from app.services.report_extraction import SUPPORTED_EXTENSIONS, OCRUnavailableError
 from app.services.report_service import ReportService
 from app.utils.rate_limit import enforce_rate_limit
 
@@ -44,6 +44,8 @@ async def upload_report(
         )
     except ValueError as exc:
         raise HTTPException(status_code=415, detail=str(exc)) from exc
+    except OCRUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     return analysis
 

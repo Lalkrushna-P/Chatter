@@ -16,9 +16,12 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
-
 ROOT = Path(__file__).resolve().parents[1]
+# load_dotenv() with no path resolves relative to this script's own directory
+# (scripts/), not the process cwd, so backend/.env (a sibling dir) is never
+# found implicitly — point it there explicitly.
+load_dotenv(ROOT / "backend" / ".env")
+
 DEFAULT_DOCS = ROOT / "knowledge-base" / "metadata" / "sample_docs.json"
 
 

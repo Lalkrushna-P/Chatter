@@ -139,6 +139,80 @@ Keep `EMBEDDING_DIMENSIONS` in sync with the `vector(N)` size in `schema.sql`.
 
 ---
 
+## Deploying to Vercel
+
+The backend and frontend deploy as **two separate Vercel projects** from the
+same GitHub repo (this isn't a Next.js monorepo, so one project per app root).
+
+### 1. Supabase (do this first)
+
+1. In the Supabase dashboard for your project: **SQL Editor** → paste and run
+   `database/schema.sql` (creates tables, the `match_medical_chunks` RPC, and RLS).
+2. **Storage** → **New bucket** → name it exactly `medical-reports` (SQL can't
+   create Storage buckets, so this is a manual dashboard step).
+3. **Project Settings → API** → copy the `service_role` secret key (never the
+   `anon` key) for the backend env vars below. Keep it out of any client-side code.
+4. Seed the knowledge base into Supabase (run locally, once, before or after
+   deploying — the deployed backend never writes to the knowledge base itself):
+   ```bash
+   cd backend
+   # .env here needs SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and whichever
+   # EMBEDDING_PROVIDER/EMBEDDING_MODEL you'll use in production — they must
+   # match exactly, or query-time embeddings won't line up with these vectors.
+   python ../scripts/ingest_documents.py
+   python ../scripts/create_embeddings.py
+   ```
+
+### 2. Backend project (Vercel dashboard → Add New → Project → import the repo)
+
+- **Root Directory**: `backend`
+- Framework is auto-detected (Vercel recognizes `app/main.py` as a FastAPI
+  entrypoint) — no build command needed.
+- **Environment Variables** (Settings → Environment Variables):
+
+  | Variable | Value |
+  |---|---|
+  | `SUPABASE_URL` | your project URL |
+  | `SUPABASE_SERVICE_ROLE_KEY` | the `service_role` secret from step 1.3 |
+  | `LLM_PROVIDER` | `anthropic` or `openai` |
+  | `LLM_API_KEY` | your key |
+  | `LLM_MODEL` | e.g. `claude-sonnet-5` |
+  | `EMBEDDING_PROVIDER` | `openai` (needs its own `EMBEDDING_API_KEY`) or `local` |
+  | `EMBEDDING_DIMENSIONS` | must match `schema.sql`'s `vector(N)` and step 1.4 |
+  | `CORS_ORIGINS` | the frontend's Vercel URL (see step 3 — set this *after* the frontend is deployed, then redeploy the backend) |
+  | `EMERGENCY_NUMBER` | a real local emergency number for your audience |
+  | `REPORT_MAX_FILE_SIZE_MB`, `REPORT_STORAGE_BUCKET`, `OCR_LANGUAGE` | defaults are fine (`10`, `medical-reports`, `eng`) |
+
+- Deploy, then note the resulting URL (e.g. `https://chatter-backend.vercel.app`).
+
+> ⚠️ **OCR does not work on a standard Vercel deployment.** Scanned PDFs and
+> photographed reports need the Tesseract/Poppler binaries, and Vercel's Python
+> Functions have no OS package manager to install them (would require switching
+> to Vercel's Docker-based Python deployment). Text-based PDF and DOCX reports
+> are unaffected. Uploading a scanned file in production now returns a clear
+> 503 instead of a crash.
+
+### 3. Frontend project (import the same repo as a second project)
+
+- **Root Directory**: `frontend`
+- Framework: Vite (auto-detected)
+- **Environment Variables**:
+
+  | Variable | Value |
+  |---|---|
+  | `VITE_API_BASE_URL` | the backend URL from step 2, no trailing slash (e.g. `https://chatter-backend.vercel.app`) |
+
+- Deploy, then note this URL too (e.g. `https://chatter-frontend.vercel.app`).
+
+### 4. Close the loop
+
+Go back to the **backend** project's env vars, set `CORS_ORIGINS` to the
+frontend's URL from step 3, and redeploy the backend (env var changes need a
+redeploy to take effect). Then open the frontend URL and confirm `/api/health`
+via the browser network tab shows no CORS errors.
+
+---
+
 ## API endpoints (PRD §25)
 
 | Method | Path | Purpose |

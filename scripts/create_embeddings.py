@@ -16,11 +16,14 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
-
 # Make the backend package importable.
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
+
+# load_dotenv() with no path resolves relative to this script's own directory
+# (scripts/), not the process cwd, so backend/.env (a sibling dir) is never
+# found implicitly — point it there explicitly.
+load_dotenv(ROOT / "backend" / ".env")
 
 from app.repositories.store import _chunk_document  # noqa: E402
 from app.services.embedding_service import EmbeddingService  # noqa: E402

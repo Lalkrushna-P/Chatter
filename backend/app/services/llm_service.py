@@ -20,10 +20,17 @@ class LLMService:
         self, system_prompt: str, user_prompt: str, fallback: str | None = None
     ) -> str:
         provider = self.settings.llm_provider
-        if provider == "anthropic" and self.settings.llm_api_key:
-            return await self._generate_anthropic(system_prompt, user_prompt)
-        if provider == "openai" and self.settings.llm_api_key:
-            return await self._generate_openai(system_prompt, user_prompt)
+        try:
+            if provider == "anthropic" and self.settings.llm_api_key:
+                return await self._generate_anthropic(system_prompt, user_prompt)
+            if provider == "openai" and self.settings.llm_api_key:
+                return await self._generate_openai(system_prompt, user_prompt)
+        except Exception as exc:
+            # Never let an LLM-provider failure (bad key, bad model, rate limit,
+            # network error, timeout) take down the whole response — the safety
+            # engine and RAG evidence are the clinically important part and must
+            # still reach the user (see README "Key architecture principle").
+            print(f"[llm_service] provider '{provider}' call failed ({exc}); using fallback text")
         return fallback or self._generate_fallback(user_prompt)
 
     async def _generate_anthropic(self, system_prompt: str, user_prompt: str) -> str:

@@ -65,3 +65,20 @@ async def test_no_definitive_diagnosis_language():
         ChatRequest(message="I have a headache and mild nausea")
     )
     assert "you have migraine" not in resp.message.lower()
+
+
+@pytest.mark.asyncio
+async def test_context_answer_gets_acknowledged_not_ignored():
+    """Answering "who is this for" should visibly react to that answer and
+    move on to the next question — not treat the answer as a fresh, contentless
+    symptom message and repeat/ignore what was just said.
+    """
+    first = await manager.handle_message(ChatRequest(message="I have a headache"))
+    cid = first.conversation_id
+    assert "for you or for someone else" in first.follow_up_question.lower()
+
+    second = await manager.handle_message(
+        ChatRequest(conversation_id=cid, message="it's for my son")
+    )
+    assert "someone else" in second.message.lower()
+    assert second.follow_up_question != first.follow_up_question

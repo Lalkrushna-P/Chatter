@@ -63,8 +63,13 @@ class ConversationManager:
 
         # If a context question (subject/age/pregnancy) was asked last turn,
         # interpret this free-text reply as its answer so the conversation
-        # moves on instead of re-asking the same question indefinitely.
+        # moves on instead of re-asking the same question indefinitely. Keep
+        # track of *which* question this was so the reply we generate below
+        # actually acknowledges the answer instead of treating "it's for my
+        # son" as a fresh, contentless symptom message.
+        awaiting_context = state.get("awaiting_context")
         self._consume_context_answer(state, req.message)
+        context_ack = self._context_answer_ack(awaiting_context, state)
 
         # Record patient context if explicitly provided this turn (takes
         # priority over the free-text inference above).
@@ -142,8 +147,20 @@ class ConversationManager:
         # 7. Ask baseline context questions early if missing
         context_q = self._pending_context_question(state, verdict)
 
-        # 8. RAG retrieval (fold in any uploaded-report context for grounding)
-        query = self.rag.build_query(req.message, merged)
+        # Decide the single next question for this turn now (context question
+        # takes priority over a symptom follow-up) so we can tell the LLM
+        # exactly what will be asked instead of letting it invent its own,
+        # possibly conflicting, question on top.
+        follow_up = context_q or self.questions.next_question(
+            merged, state.get("questions_asked", [])
+        )
+
+        # 8. RAG retrieval (fold in any uploaded-report context for grounding).
+        # A message that was purely answering a context question (e.g. "it's
+        # for my son") carries no clinical signal, so query on the known
+        # symptoms alone rather than diluting/derailing retrieval with it.
+        query_message = req.message if not awaiting_context else ""
+        query = self.rag.build_query(query_message, merged)
         if report_context:
             query = f"{query} {' '.join(report_context)}"
         evidence = await self.rag.retrieve(query)
@@ -161,18 +178,23 @@ class ConversationManager:
             evidence=evidence,
             special_flags=verdict.special_flags,
             report_context=report_context,
+            answered_context_question=CONTEXT_QUESTIONS.get(awaiting_context),
+            pending_follow_up=follow_up,
         )
         llm_text = await self.llm.generate(
-            SYSTEM_PROMPT, user_prompt, fallback=build_grounded_fallback(evidence, merged)
+            SYSTEM_PROMPT,
+            user_prompt,
+            fallback=build_grounded_fallback(
+                evidence, merged, skip_intro=bool(context_ack)
+            ),
         )
 
         # 10. Output safety validation
         safe_text = self.validator.sanitize(llm_text)
+        if context_ack:
+            safe_text = f"{context_ack} {safe_text}"
 
-        # 11. Follow-up question (context question takes priority)
-        follow_up = context_q or self.questions.next_question(
-            merged, state.get("questions_asked", [])
-        )
+        # 11. Record the follow-up as asked
         if follow_up:
             state.setdefault("questions_asked", []).append(follow_up)
 
@@ -289,6 +311,28 @@ class ConversationManager:
             state["age"] = value
         elif awaiting == "pregnancy":
             state["is_pregnant"] = value
+
+    def _context_answer_ack(self, awaiting: Optional[str], state: dict) -> Optional[str]:
+        """A short, deterministic acknowledgment of a just-answered context
+        question, prepended to the reply so the conversation visibly responds
+        to what the user just said (e.g. who the symptoms are for) instead of
+        the LLM treating a contentless answer like "it's for my son" as a new
+        symptom description with nothing to react to.
+        """
+        if awaiting == "subject":
+            if state.get("subject") == "someone_else":
+                return "Got it, thanks — this assessment is for someone else."
+            return "Got it, thanks — this assessment is for you."
+        if awaiting == "age":
+            age = state.get("age")
+            return (
+                f"Thanks, noted their age as {age}."
+                if age is not None
+                else "Thanks — I couldn't quite catch an age there, but let's continue."
+            )
+        if awaiting == "pregnancy":
+            return "Thanks, noted."
+        return None
 
     def _possible_explanations(self, evidence: list) -> list[str]:
         """Derive up to 5 possible categories from retrieved evidence titles.

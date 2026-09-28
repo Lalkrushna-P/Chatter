@@ -64,6 +64,8 @@ def build_user_prompt(
     evidence: list,
     special_flags: list[str],
     report_context: list[str] | None = None,
+    answered_context_question: str | None = None,
+    pending_follow_up: str | None = None,
 ) -> str:
     history_text = "\n".join(
         f"{m['role']}: {m['content']}" for m in history[-8:]
@@ -96,12 +98,32 @@ def build_user_prompt(
         f"\nUPLOADED REPORT CONTEXT:\n{reports_text}\n" if reports_text else ""
     )
 
+    context_answer_block = (
+        f"\nNOTE: The CURRENT USER MESSAGE below is only their answer to a "
+        f"question you asked last turn — \"{answered_context_question}\" — not "
+        "a new symptom description. Your reply should briefly react to that "
+        "answer (the app has already acknowledged it, so don't repeat it "
+        "verbatim); do not treat it as if no information was given.\n"
+        if answered_context_question
+        else ""
+    )
+
+    follow_up_block = (
+        f'\nThe app will separately send this exact follow-up question right '
+        f'after your reply: "{pending_follow_up}". Do NOT ask your own '
+        "follow-up question and do NOT ask or restate this one yourself — "
+        "just write the supportive/informational part of the reply.\n"
+        if pending_follow_up
+        else "\nNo further follow-up question is planned this turn — you may "
+        "ask one clarifying question if genuinely useful.\n"
+    )
+
     return f"""CONVERSATION HISTORY:
 {history_text}
 
 CURRENT USER MESSAGE:
 {user_message}
-
+{context_answer_block}
 STRUCTURED SYMPTOMS (extracted):
 {symptom_lines}
 
@@ -112,13 +134,14 @@ SAFETY ENGINE VERDICT:
 {reports_block}
 RETRIEVED MEDICAL EVIDENCE (use ONLY this for medical claims):
 {evidence_text}
-
+{follow_up_block}
 TASK:
 Write a brief, supportive reply that:
-1. Acknowledges what the user described.
+1. Acknowledges what the user described (or, per the note above, their answer).
 2. If risk_level is emergency, be concise and action-oriented; tell them to seek
    emergency care now and do NOT continue lengthy questioning.
-3. Otherwise, ask ONE or TWO of the most useful follow-up questions.
+3. Do not invent your own follow-up question — see the note above about what,
+   if anything, the app will ask next.
 4. Only mention possible explanations if supported by the retrieved evidence, and
    frame them as possibilities, not a diagnosis.
 5. If uploaded report context is provided above, connect it to the user's symptoms

@@ -77,7 +77,9 @@ class OutputSafetyValidator:
         )
 
 
-def build_grounded_fallback(evidence: list, symptoms: list) -> str:
+def build_grounded_fallback(
+    evidence: list, symptoms: list, *, skip_intro: bool = False
+) -> str:
     """Deterministic, evidence-grounded connective text for LLMService.generate's
     `fallback` parameter — used whenever no LLM call succeeds (no provider
     configured, or a provider failure like the offline/no-key path or a bad
@@ -88,20 +90,28 @@ def build_grounded_fallback(evidence: list, symptoms: list) -> str:
     the API response were already grounded — this makes the message text match,
     so the app is genuinely useful without any LLM at all (README "Runs with
     zero API keys"), not just a safety-net placeholder.
+
+    `skip_intro` drops the "Thanks for sharing..." opener for turns where the
+    conversation manager has already prepended its own acknowledgment (e.g. of
+    a just-answered context question) — otherwise the reply stacks two
+    unrelated conversational openers back to back.
     """
     symptom_names = ", ".join(s.name for s in symptoms) if symptoms else None
-    intro = (
-        f"Thanks for sharing that you've been experiencing {symptom_names}."
-        if symptom_names
-        else "Thanks for sharing that."
-    )
+    if skip_intro:
+        intro = ""
+    else:
+        intro = (
+            f"Thanks for sharing that you've been experiencing {symptom_names}."
+            if symptom_names
+            else "Thanks for sharing that."
+        )
 
     if not evidence:
         return (
             f"{intro} I don't have specific reference material for this yet, so I "
             "can't offer detailed possibilities, but I'll keep asking a few "
             "questions to help understand how urgent this may be."
-        )
+        ).strip()
 
     titles: list[str] = []
     for e in evidence[:3]:
@@ -119,7 +129,7 @@ def build_grounded_fallback(evidence: list, symptoms: list) -> str:
         f"{possibilities}. {blurb} This is general information based on our "
         "reference material, not a determination of what's causing your symptoms "
         "— I'll ask a couple more questions to help narrow things down."
-    )
+    ).strip()
 
 
 def recommended_action(risk: RiskLevel) -> str:

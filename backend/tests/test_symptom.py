@@ -26,6 +26,16 @@ def test_extract_onset():
     assert isinstance(symptoms, list)
 
 
+def test_extract_followup_attributes_without_symptom_name():
+    """A bare follow-up answer like "severity is 8 out of 10, lasted 2 days"
+    names no symptom at all — extract() alone would find nothing and drop the
+    severity/duration entirely. extract_followup_attributes() is the fallback
+    that actually surfaces it (wired in by ConversationManager)."""
+    attrs = svc.extract_followup_attributes("severity is 8 out of 10, lasted 2 days")
+    assert attrs["severity"] == 8
+    assert "2 day" in (attrs["duration"] or "")
+
+
 def test_merge_updates_existing():
     existing = [Symptom(name="headache")]
     new = [Symptom(name="headache", severity=7)]

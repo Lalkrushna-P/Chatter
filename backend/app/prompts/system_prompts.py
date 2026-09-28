@@ -66,6 +66,7 @@ def build_user_prompt(
     report_context: list[str] | None = None,
     answered_context_question: str | None = None,
     pending_follow_up: str | None = None,
+    patient_age: int | None = None,
 ) -> str:
     history_text = "\n".join(
         f"{m['role']}: {m['content']}" for m in history[-8:]
@@ -96,6 +97,13 @@ def build_user_prompt(
 
     reports_block = (
         f"\nUPLOADED REPORT CONTEXT:\n{reports_text}\n" if reports_text else ""
+    )
+
+    age_block = (
+        f"\nPATIENT AGE: {patient_age} — tailor your explanation to this age "
+        "group (e.g. pediatric, adult, or older-adult considerations differ).\n"
+        if patient_age is not None
+        else ""
     )
 
     context_answer_block = (
@@ -131,7 +139,7 @@ SAFETY ENGINE VERDICT:
 - risk_level: {risk_level.value}
 - red_flags: {flags_text}
 - special_populations: {special_text}
-{reports_block}
+{age_block}{reports_block}
 RETRIEVED MEDICAL EVIDENCE (use ONLY this for medical claims):
 {evidence_text}
 {follow_up_block}

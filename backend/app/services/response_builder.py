@@ -4,6 +4,7 @@ Implements Layer 4 output safety (PRD section 31) and the emergency response
 policy (PRD section 32). The safety engine's verdict can OVERRIDE the LLM text.
 """
 import re
+from typing import Optional
 
 from app.config import Settings, get_settings
 from app.schemas.common import RiskLevel
@@ -47,6 +48,64 @@ DEFAULT_WARNING_SIGNS = [
     "You have difficulty breathing or chest pain",
     "You experience severe or persistent vomiting",
 ]
+
+# Which kind of specialist a "seek care" recommendation should point to, keyed
+# by the canonical symptom name (app.services.symptom_service.SYMPTOM_LEXICON).
+# Deliberately coarse and non-exhaustive — this is a starting point for where
+# to look, never a referral, so anything unmapped falls back to a generic GP.
+SYMPTOM_TO_SPECIALIST = {
+    "headache": "neurologist",
+    "dizziness": "neurologist",
+    "chest pain": "cardiologist",
+    "palpitations": "cardiologist",
+    "shortness of breath": "pulmonologist",
+    "cough": "pulmonologist",
+    "abdominal pain": "gastroenterologist",
+    "nausea": "gastroenterologist",
+    "vomiting": "gastroenterologist",
+    "diarrhea": "gastroenterologist",
+    "constipation": "gastroenterologist",
+    "back pain": "orthopedist",
+    "joint pain": "orthopedist or rheumatologist",
+    "rash": "dermatologist",
+    "eye pain": "ophthalmologist",
+    "ear pain": "ENT specialist",
+    "sore throat": "ENT specialist",
+    "swelling": "cardiologist or vascular specialist",
+    "insomnia": "sleep specialist",
+    "numbness": "neurologist",
+    "weakness": "neurologist",
+}
+DEFAULT_SPECIALIST = "doctor"
+
+
+def specialist_for(symptom_name: Optional[str]) -> str:
+    return SYMPTOM_TO_SPECIALIST.get(symptom_name or "", DEFAULT_SPECIALIST)
+
+
+def trend_recommended_action(trend: str, symptom_name: Optional[str]) -> str:
+    """Deterministic guidance keyed off "Have your symptoms been getting
+    better, worse, or staying the same?" — layered on top of (never replacing)
+    the safety engine's own risk-based action, and independent of the LLM.
+    """
+    if trend == "worse":
+        return (
+            f"Since your symptoms are getting worse, please contact a "
+            f"{specialist_for(symptom_name)} as soon as possible rather than "
+            "waiting to see if it resolves on its own."
+        )
+    if trend == "same":
+        return (
+            "Since your symptoms haven't improved, this needs attention — "
+            "please schedule an appointment with a healthcare professional."
+        )
+    if trend == "better":
+        return (
+            "Good to hear it's improving — continue your current care or "
+            "medication as advised, and seek medical attention if it stops "
+            "improving or comes back."
+        )
+    return ""
 
 
 class OutputSafetyValidator:

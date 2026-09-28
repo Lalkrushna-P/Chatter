@@ -22,15 +22,36 @@ from app.services.response_builder import (
     OutputSafetyValidator,
     build_grounded_fallback,
     recommended_action,
+    trend_recommended_action,
     warning_signs_for,
 )
 from app.services.safety_service import SafetyService, SafetyVerdict
 from app.services.symptom_service import (
     CONTEXT_QUESTIONS,
+    TREND_QUESTION,
     QuestionEngine,
     SymptomService,
     parse_context_answer,
+    parse_trend_answer,
 )
+
+
+def _age_descriptor(age: Optional[int]) -> str:
+    """A short age-band phrase folded into the RAG query so retrieval — and,
+    via the LLM prompt, the generated explanation — actually differs by age
+    (e.g. a pediatric vs. an elderly presentation of the same symptom).
+    """
+    if age is None:
+        return ""
+    if age < 1:
+        return f"age {age} infant"
+    if age < 12:
+        return f"age {age} child pediatric"
+    if age < 18:
+        return f"age {age} adolescent teen"
+    if age >= 65:
+        return f"age {age} elderly older adult"
+    return f"age {age} adult"
 
 
 class ConversationManager:
@@ -71,6 +92,15 @@ class ConversationManager:
         self._consume_context_answer(state, req.message)
         context_ack = self._context_answer_ack(awaiting_context, state)
 
+        # Same idea for "Have your symptoms been getting better, worse, or
+        # staying the same?" — the answer directly drives the recommended
+        # action below (worse/same/better), independent of the LLM.
+        if state.get("awaiting_trend"):
+            trend = parse_trend_answer(req.message)
+            if trend:
+                state["trend"] = trend
+        state["awaiting_trend"] = None
+
         # Record patient context if explicitly provided this turn (takes
         # priority over the free-text inference above).
         if req.subject:
@@ -93,6 +123,25 @@ class ConversationManager:
         existing = [Symptom(**s) for s in state.get("symptoms", [])]
         new = self.symptoms.extract(req.message)
         merged = self.symptoms.merge(existing, new)
+        if not new and merged:
+            # This message named no symptom of its own — it's very likely a
+            # bare follow-up answer (e.g. "severity is 8 out of 10, lasted 2
+            # days"). Apply any severity/duration/onset it mentions to the
+            # symptom the question engine is actually focused on (same
+            # priority order as next_question: most severe first), instead of
+            # silently discarding an answer just because it didn't restate
+            # the symptom's name.
+            followup = self.symptoms.extract_followup_attributes(req.message)
+            if any(followup.values()):
+                target = sorted(
+                    merged, key=lambda s: (s.severity or 0), reverse=True
+                )[0]
+                if followup["severity"] is not None:
+                    target.severity = followup["severity"]
+                if followup["duration"]:
+                    target.duration = followup["duration"]
+                if followup["onset"]:
+                    target.onset = followup["onset"]
         state["symptoms"] = [s.model_dump() for s in merged]
 
         # 4. Safety engine over the FULL user-side conversation (cumulative)
@@ -113,6 +162,9 @@ class ConversationManager:
 
         # Tighten thresholds for special populations (PRD sections 31, 33)
         verdict = self._apply_special_population_rules(verdict, state)
+        # A reported worsening (or unchanged) trend genuinely changes how
+        # urgently care should be sought, independent of the LLM.
+        verdict = self._apply_trend_rules(verdict, state)
 
         # Baseline floor: once at least one symptom is identified and no red flag
         # fired, resolve to Level 4 self-care/monitoring instead of staying
@@ -154,6 +206,8 @@ class ConversationManager:
         follow_up = context_q or self.questions.next_question(
             merged, state.get("questions_asked", [])
         )
+        if follow_up == TREND_QUESTION:
+            state["awaiting_trend"] = True
 
         # 8. RAG retrieval (fold in any uploaded-report context for grounding).
         # A message that was purely answering a context question (e.g. "it's
@@ -161,11 +215,17 @@ class ConversationManager:
         # symptoms alone rather than diluting/derailing retrieval with it.
         query_message = req.message if not awaiting_context else ""
         query = self.rag.build_query(query_message, merged)
+        # Age materially changes what's likely and what's urgent (e.g. a
+        # "sudden severe headache" reads differently for an infant vs an
+        # adult) — fold it into retrieval too, not just the safety floor.
+        age_descriptor = _age_descriptor(state.get("age"))
+        if age_descriptor:
+            query = f"{query} {age_descriptor}"
         if report_context:
             query = f"{query} {' '.join(report_context)}"
         evidence = await self.rag.retrieve(query)
         sources = self.rag.to_sources(evidence)
-        possible = self._possible_explanations(evidence)
+        possible = self._possible_explanations(evidence, merged, state)
 
         # 9. LLM generation grounded in evidence
         history = self.store.get_messages(conversation_id)
@@ -180,6 +240,7 @@ class ConversationManager:
             report_context=report_context,
             answered_context_question=CONTEXT_QUESTIONS.get(awaiting_context),
             pending_follow_up=follow_up,
+            patient_age=state.get("age"),
         )
         llm_text = await self.llm.generate(
             SYSTEM_PROMPT,
@@ -241,7 +302,7 @@ class ConversationManager:
             risk_level=verdict.risk_level,
             possible_categories=possible,
             red_flags=verdict.red_flags,
-            recommended_action=recommended_action(verdict.risk_level),
+            recommended_action=self._recommended_action_for(verdict, state),
             follow_up_question=follow_up,
             sources=sources,
             is_emergency=verdict.risk_level == RiskLevel.EMERGENCY,
@@ -279,6 +340,36 @@ class ConversationManager:
             verdict.risk_level = floor
             verdict.is_emergency = floor == RiskLevel.EMERGENCY
         return verdict
+
+    def _apply_trend_rules(self, verdict: SafetyVerdict, state: dict) -> SafetyVerdict:
+        """A worsening — or flatly unchanged — trend is itself a safety signal,
+        not just conversational color: "getting worse" means seek care sooner
+        regardless of the original risk level, and "staying the same" means
+        it's not resolving on its own and needs attention rather than more
+        waiting. Monotonic, like every other floor here — never lowers risk.
+        """
+        trend = state.get("trend")
+        floor = None
+        if trend == "worse":
+            floor = RiskLevel.URGENT
+        elif trend == "same":
+            floor = RiskLevel.ROUTINE
+
+        if floor and verdict.risk_level.rank < floor.rank:
+            verdict.risk_level = floor
+            verdict.is_emergency = floor == RiskLevel.EMERGENCY
+        return verdict
+
+    def _recommended_action_for(self, verdict: SafetyVerdict, state: dict) -> str:
+        action = recommended_action(verdict.risk_level)
+        trend = state.get("trend")
+        if not trend:
+            return action
+        symptoms = state.get("symptoms", [])
+        primary = max(symptoms, key=lambda s: s.get("severity") or 0, default=None)
+        primary_name = primary.get("name") if primary else None
+        trend_action = trend_recommended_action(trend, primary_name)
+        return f"{action} {trend_action}" if trend_action else action
 
     def _pending_context_question(
         self, state: dict, verdict: SafetyVerdict
@@ -344,17 +435,40 @@ class ConversationManager:
             return "Thanks, noted."
         return None
 
-    def _possible_explanations(self, evidence: list) -> list[str]:
-        """Derive up to 5 possible categories from retrieved evidence titles.
+    def _possible_explanations(
+        self, evidence: list, symptoms: list[Symptom], state: dict
+    ) -> list[str]:
+        """Derive possible categories from retrieved evidence titles, narrowing
+        the list as more clinical detail is known.
 
-        Only surfaces possibilities grounded in retrieved documents (PRD section 17).
+        `evidence` is already ranked best-first by RAGService, so capping the
+        list length is enough to keep only the strongest matches — the whole
+        point is that the differential actually narrows as the conversation
+        goes on instead of showing the same 5 titles turn after turn. "Known"
+        detail = the core follow-up attributes on the primary symptom, plus
+        the two conversation-level context questions (age, trend).
         """
+        ordered = sorted(symptoms, key=lambda s: (s.severity or 0), reverse=True)
+        primary = ordered[0] if ordered else None
+        known = 0
+        if primary:
+            known += sum(
+                1
+                for attr in ("severity", "duration", "onset")
+                if getattr(primary, attr, None)
+            )
+        if state.get("age") is not None:
+            known += 1
+        if state.get("trend"):
+            known += 1
+        limit = max(2, 5 - known)
+
         seen = []
         for e in evidence:
             title = (e.title or "").strip()
             if title and title not in seen:
                 seen.append(title)
-        return seen[:5]
+        return seen[:limit]
 
     # ------------------------------------------------------------------
     def build_summary(self, conversation_id: str) -> Optional[AssessmentSummary]:

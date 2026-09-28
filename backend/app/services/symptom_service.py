@@ -80,6 +80,22 @@ class SymptomService:
                 symptom.onset = onset
         return list(found.values())
 
+    def extract_followup_attributes(self, text: str) -> dict:
+        """Pull severity/duration/onset out of a message that answers a
+        follow-up question without necessarily re-stating the symptom name
+        (e.g. "severity is 8 out of 10, lasted 2 days"). extract() only
+        attaches these to a symptom it finds a lexicon match for *in the same
+        message*, so a bare follow-up answer like that would otherwise be
+        silently dropped — never folded into the RAG query, never narrowing
+        the possible-explanations list, even though the user did answer.
+        """
+        norm = _normalize(text)
+        return {
+            "severity": self._extract_severity(norm),
+            "duration": self._extract_duration(norm),
+            "onset": self._extract_onset(norm),
+        }
+
     def merge(self, existing: list[Symptom], new: list[Symptom]) -> list[Symptom]:
         """Merge newly extracted symptoms into the running state without duplicates."""
         by_name = {s.name: s for s in existing}
@@ -297,6 +313,8 @@ QUESTION_BANK: dict[str, list[FollowUpQuestion]] = {
     ],
 }
 
+TREND_QUESTION = "Have your symptoms been getting better, worse, or staying the same?"
+
 GENERIC_QUESTIONS = [
     FollowUpQuestion(
         "How long have you been experiencing this, and how severe would you say it "
@@ -304,7 +322,7 @@ GENERIC_QUESTIONS = [
         skip_if_attrs=("duration", "severity"),
     ),
     FollowUpQuestion("Have you noticed any other symptoms alongside this?"),
-    FollowUpQuestion("Have your symptoms been getting better, worse, or staying the same?"),
+    FollowUpQuestion(TREND_QUESTION),
 ]
 
 # Baseline context questions (PRD section 33)
@@ -322,6 +340,33 @@ _SOMEONE_ELSE_PHRASES = [
 ]
 _PREGNANT_YES_PHRASES = ["yes", "pregnant", "i am", "i'm", "could be"]
 _PREGNANT_NO_PHRASES = ["no", "not pregnant", "n/a", "na"]
+
+_TREND_WORSE_PHRASES = [
+    "worse", "worsening", "worsened", "worst", "deteriorat", "gotten worse",
+    "getting worse",
+]
+_TREND_BETTER_PHRASES = [
+    "better", "improving", "improved", "improvement", "getting better",
+]
+_TREND_SAME_PHRASES = [
+    "same", "no change", "not changed", "unchanged", "stable", "staying the same",
+]
+
+
+def parse_trend_answer(text: str) -> Optional[str]:
+    """Deterministically interpret a reply to TREND_QUESTION as "worse",
+    "better", "same", or None if the answer is too ambiguous to classify.
+    Checked in this order because a worsening trend is the safety-critical
+    signal to catch even if the reply also hedges with other words.
+    """
+    normalized = _normalize(text)
+    if any(p in normalized for p in _TREND_WORSE_PHRASES):
+        return "worse"
+    if any(p in normalized for p in _TREND_BETTER_PHRASES):
+        return "better"
+    if any(p in normalized for p in _TREND_SAME_PHRASES):
+        return "same"
+    return None
 
 
 def parse_context_answer(awaiting: str, text: str):

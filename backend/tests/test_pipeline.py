@@ -82,3 +82,16 @@ async def test_context_answer_gets_acknowledged_not_ignored():
     )
     assert "someone else" in second.message.lower()
     assert second.follow_up_question != first.follow_up_question
+
+
+def test_consume_context_answer_nulls_key_instead_of_removing():
+    """SupabaseStore.upsert_assessment merges each save onto a freshly re-fetched
+    copy of the existing row, so a key that's merely *absent* from this turn's
+    state dict (e.g. via dict.pop()) doesn't get cleared in storage — the stale
+    value silently wins the merge again next turn. The key must stay present,
+    set to None, so the merge actually overwrites it.
+    """
+    state = {"awaiting_context": "subject"}
+    manager._consume_context_answer(state, "it is for me")
+    assert "awaiting_context" in state
+    assert state["awaiting_context"] is None

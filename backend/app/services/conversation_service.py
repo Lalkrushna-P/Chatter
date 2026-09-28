@@ -297,8 +297,18 @@ class ConversationManager:
     def _consume_context_answer(self, state: dict, message: str) -> None:
         """Interpret this message as the answer to last turn's pending context
         question (if any), so the same question is never re-asked (PRD section 33).
+
+        Explicitly set to None rather than popped: SupabaseStore.upsert_assessment
+        merges onto a freshly re-fetched copy of the existing row, so a key that's
+        merely *absent* from this turn's state dict doesn't get cleared — the
+        stale value from the DB silently wins the merge again. Setting it to None
+        keeps the key present so the merge actually overwrites it, otherwise this
+        question is treated as still "awaiting" forever: every later message gets
+        reinterpreted as its answer (corrupting subject/age/pregnancy) and the
+        same acknowledgment gets prepended to every subsequent reply.
         """
-        awaiting = state.pop("awaiting_context", None)
+        awaiting = state.get("awaiting_context")
+        state["awaiting_context"] = None
         if not awaiting:
             return
         value = parse_context_answer(awaiting, message)
